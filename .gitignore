@@ -16,3 +16,6 @@ venv/
 .probe-phase*/
 viewer/dist/
 
+# project-memory-system runtime (SessionEnd raw transcripts)
+.claude/sessions/
+

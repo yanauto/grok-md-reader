@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Read(~/workspace/myself/projects/grok-md-reader/**)",
+      "Write(~/workspace/myself/projects/grok-md-reader/**)",
+      "Edit(~/workspace/myself/projects/grok-md-reader/**)",
+      "Bash(bash:*)",
+      "Bash(/usr/bin/python3:*)",
+      "Bash(vitals:*)",
+      "Bash(/opt/homebrew/bin/vitals:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/workspace/myself/projects/grok-md-reader/.claude/hooks/session-start.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/workspace/myself/projects/grok-md-reader/.claude/hooks/session-end.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/workspace/myself/projects/grok-md-reader/.claude/hooks/user-prompt-submit.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
