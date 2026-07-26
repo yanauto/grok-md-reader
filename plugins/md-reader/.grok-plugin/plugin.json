@@ -1,0 +1,19 @@
+{
+  "name": "md-reader",
+  "version": "0.3.0",
+  "description": "MdReader companion window + side-channel last_path/history. Slash: /open, /preview. One-shot install: ./install.sh",
+  "author": {
+    "name": "yan-auto"
+  },
+  "homepage": "https://github.com/yan-auto/grok-md-reader",
+  "repository": "https://github.com/yan-auto/grok-md-reader",
+  "license": "MIT",
+  "keywords": [
+    "markdown",
+    "preview",
+    "open",
+    "reader",
+    "grok",
+    "cli"
+  ]
+}

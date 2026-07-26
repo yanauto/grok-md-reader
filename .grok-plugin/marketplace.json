@@ -1,0 +1,20 @@
+{
+  "name": "yan-auto Grok Plugins",
+  "description": "Local plugins by yan-auto — md-reader and future tools",
+  "owner": {
+    "name": "yan-auto"
+  },
+  "plugins": [
+    {
+      "name": "md-reader",
+      "description": "Open Markdown/text from Grok CLI into MdReader companion window (browser-quality render)",
+      "category": "productivity",
+      "version": "0.3.0",
+      "tags": ["markdown", "preview", "open", "grok-cli"],
+      "source": {
+        "type": "local",
+        "path": "./plugins/md-reader"
+      }
+    }
+  ]
+}

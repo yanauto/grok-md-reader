@@ -1,0 +1,17 @@
+{
+  "description": "Side-channel: on md write/edit, record last_path + session history under GROK_PLUGIN_DATA. No visible TUI output. Disable: MD_READER_HOOK_DISABLE=1 or touch $GROK_PLUGIN_DATA/hook_disabled",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "write|search_replace",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${GROK_PLUGIN_ROOT}/hooks/on_md_write.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

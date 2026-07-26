@@ -1,0 +1,34 @@
+{
+  "default": "md-reader",
+  "by_extension": {
+    ".md": "md-reader",
+    ".markdown": "md-reader",
+    ".txt": "md-reader",
+    ".mdc": "md-reader"
+  },
+  "apps": {
+    "md-reader": {
+      "notes": "Companion WKWebView window (URL scheme md-reader://). Implemented in open_path.py, not a shell argv."
+    },
+    "system": {
+      "darwin": ["open"],
+      "linux": ["xdg-open"]
+    },
+    "typora": {
+      "darwin": ["open", "-a", "Typora"]
+    },
+    "obsidian": {
+      "darwin": ["open", "-a", "Obsidian"]
+    },
+    "vscode": {
+      "darwin": ["open", "-a", "Visual Studio Code"]
+    },
+    "cursor": {
+      "darwin": ["open", "-a", "Cursor"]
+    },
+    "preview": {
+      "darwin": ["open", "-a", "Preview"]
+    }
+  },
+  "notes": "Copy to $GROK_PLUGIN_DATA/readers.json or ~/.config/grok-md-reader/readers.json and edit. default=md-reader uses the companion viewer when installed."
+}
