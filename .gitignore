@@ -16,6 +16,9 @@ venv/
 .probe-phase*/
 viewer/dist/
 
+# compiled Launch Services helper (apply_os_defaults.py)
+plugins/md-reader/scripts/.cache/
+
 # project-memory-system runtime (SessionEnd raw transcripts)
 .claude/sessions/
 

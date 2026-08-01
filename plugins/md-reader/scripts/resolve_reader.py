@@ -30,7 +30,7 @@ def load_config() -> dict:
                 return json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
-    return {"default": "md-reader", "by_extension": {}}
+    return {"default": "system", "by_extension": {}}
 
 
 def main() -> int:
@@ -40,7 +40,7 @@ def main() -> int:
     path = Path(sys.argv[1])
     cfg = load_config()
     ext = path.suffix.lower()
-    app = (cfg.get("by_extension") or {}).get(ext) or cfg.get("default") or "md-reader"
+    app = (cfg.get("by_extension") or {}).get(ext) or cfg.get("default") or "system"
     print(json.dumps({"path": str(path), "app": app, "extension": ext}, ensure_ascii=False))
     return 0
 

@@ -1,6 +1,6 @@
 # grok-md-reader
 
-A markdown companion for Grok CLI on macOS. Your agent writes a `.md` file, and a native window shows it fully rendered — tables, code highlighting, the lot.
+A markdown companion for Grok CLI on macOS. **Install once, then Cmd+click file paths on tool lines** — they open in the right app (MdReader for `.md`, Preview for PDF, …).
 
 [中文说明 / Chinese version](README.zh-CN.md)
 
@@ -10,17 +10,14 @@ A markdown companion for Grok CLI on macOS. Your agent writes a `.md` file, and 
 
 ## Why I built this
 
-I run coding agents in a terminal most of the day, and they produce markdown constantly: reports, plans, research notes. The terminal shows all of that as raw text. Every time I wanted to actually read a document, I had to dig it out of Finder or open an editor, and after a few weeks of that I got tired of it.
-
-Claude Desktop handles this nicely: the session hands you a file, you click it, you read it rendered. I wanted the same flow for Grok CLI, so I built it as a plugin plus a tiny viewer app.
+Coding agents produce markdown all day. The terminal shows raw text; I wanted Claude Desktop–style “click and read” for Grok CLI without teaching every agent a custom ritual.
 
 ## What you get
 
-- **MdReader.app** — a small native viewer (Swift + WKWebView) with bundled marked and highlight.js. It renders offline; nothing leaves your machine.
-- **A Grok plugin** — `/open <path>` and `/preview` commands, plus a skill so the agent itself can open a file for you when you ask.
-- **Automatic tracking** — a `PostToolUse` hook records every markdown file the agent writes during a session. `/preview` opens the most recent one, and the History button in the viewer switches between all of them.
-- **Hot refresh** — while a file is open, the viewer watches it. When the agent keeps editing, the window re-renders on its own. When the file disappears, the viewer degrades gracefully.
-- **Click to open** — Grok's tool lines carry `file://` hyperlinks. Set MdReader as your default app for `.md` and Cmd+clicking any written path opens it rendered.
+- **Install-and-click** — `./install.sh` builds **MdReader.app**, links the Grok plugin, and **sets macOS default apps** from one config (`.md` → MdReader, `.pdf` → Preview, Office when installed). Grok tool lines already emit `file://` links; Cmd+click uses system `open` → those defaults. **No agent cooperation required.**
+- **MdReader.app** — native viewer (Swift + WKWebView), offline marked + highlight.js.
+- **Fallback `/open` / `/preview`** — when the path is plain chat text (not a hyperlink) or the terminal ignores OSC-8.
+- **Optional tracking** — hook records files the agent writes; History + hot refresh in the viewer.
 
 ## Install
 
@@ -32,53 +29,60 @@ cd grok-md-reader
 ./install.sh
 ```
 
-That single script builds **MdReader.app**, links the Grok plugin, and installs the tracking hook. Equivalent manual steps live in [`install.sh`](install.sh) if you prefer to run them one by one.
+That script:
 
-Check that everything landed:
+1. Builds and installs `~/Applications/MdReader.app`
+2. Links `~/.grok/plugins/md-reader`
+3. Installs the side-channel tracking hook
+4. **Applies OS default handlers** (skip with `./install.sh --no-set-defaults`)
+5. Runs **doctor**
 
 ```bash
-grok inspect        # Plugins → md-reader
-python3 plugins/md-reader/skills/open-md/scripts/open_path.py README.md
-# a MdReader window should pop up
-
-# after an agent writes a .md in a new session:
-cat ~/.grok/plugin-data/user/md-reader/last_path
+./install.sh --doctor          # re-check anytime
+./install.sh --set-defaults    # re-apply defaults only
+./install.sh --no-set-defaults # install without changing defaults
 ```
 
-## Click to open (optional, recommended)
+## How to open files
 
-Grok's TUI already emits `file://` hyperlinks on its Write/Edit tool lines. To make those clicks land in MdReader:
+| Situation | What to do |
+|-----------|------------|
+| Path on a **tool line** (Write / Read / Edit) | **Cmd+click** the path |
+| Path is **plain chat text** only | `/open /full/path` or ask the agent to open it |
+| Terminal without OSC-8 (some Terminal.app setups) | `/open` / `/preview` |
 
-1. Select any `.md` file in Finder and press ⌘I.
-2. Under "Open with", choose **MdReader**, then click **Change All…**.
+**Out of scope:** arbitrary bare paths in chat bubbles are usually **not** hyperlinks. That is a Grok TUI limit, not a missing install step.
 
-From then on, Cmd+click on a written path in the session opens the rendered document. The install scripts never touch your default apps; this step stays manual on purpose.
+## Customize mapping
 
-One dependency to know about: clickable paths rely on your terminal's OSC-8 hyperlink support. iTerm2 and Ghostty handle it with Cmd+click. The built-in Terminal.app ignores these links — `/open` and `/preview` cover that case.
+Single source: `plugins/md-reader/config/readers.example.json`.
 
-## Turning the tracking hook off
+Copy to `~/.grok/plugin-data/user/md-reader/readers.json` and edit `by_extension` / `apps` / `os_defaults.apply_extensions`. Then:
+
+```bash
+./install.sh --set-defaults
+```
+
+`/open` uses the same table via `open_path.py`.
+
+## Tracking hook
 
 ```bash
 touch ~/.grok/plugin-data/user/md-reader/hook_disabled   # off
 rm    ~/.grok/plugin-data/user/md-reader/hook_disabled   # on
-# or set MD_READER_HOOK_DISABLE=1
 ```
 
-The hook writes two small local files (`last_path` and a per-session history list) and produces no visible output in your session.
-
-## Using a different viewer
-
-`config/readers.example.json` maps file extensions to apps. Copy it to `$GROK_PLUGIN_DATA/readers.json` and point `.md` at `system`, `typora`, `vscode`, or any app you like. MdReader is the default.
+Silent side-channel only (last_path + history). Not required for Cmd+click.
 
 ## Design notes
 
-The viewer and the plugin are deliberately separate: they talk through the `md-reader://` URL scheme, so either side can be replaced or upgraded on its own. The hook stays silent because Grok ignores stdout from passive hooks — I verified this against the grok-build source before settling on the design. The full design history lives in [`docs/`](docs/) (written in Chinese): probe experiments, source findings, and the reasoning behind each phase.
+Click bus = **OS defaults**. The plugin cannot intercept Grok’s `file://` opener; install stands on the OS side of that call. Details: [`docs/decisions/0002-os-defaults-install-and-click.md`](docs/decisions/0002-os-defaults-install-and-click.md), [`docs/`](docs/).
 
 ## Limits
 
-- The viewer is macOS-only for now. On Linux the plugin still works with `readers.json` mapped to `xdg-open` or an app of your choice.
-- Clicking arbitrary file names in chat text is out of scope; the hyperlinks live on tool lines.
-- Workspace-boundary enforcement (refusing to open files outside the project) is on the roadmap.
+- Viewer is macOS-only. Linux: plugin + `readers.json` / `xdg-open`.
+- Chat plain-text paths are not clickable by design of the TUI.
+- Install **does** change default apps for listed types unless you pass `--no-set-defaults`.
 
 ## License
 

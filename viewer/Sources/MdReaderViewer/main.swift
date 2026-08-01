@@ -106,6 +106,8 @@ final class ViewerController: NSObject, WKNavigationDelegate, NSMenuItemValidati
     private var statusLabel: NSTextField!
     private var currentPath: String?
     private let resourceDir: URL
+    /// Temp HTML used by loadFileURL (loadHTMLString blocks local image file:// loads).
+    private var previewFileURL: URL?
 
     // FS watch
     private var fileSource: DispatchSourceFileSystemObject?
@@ -165,6 +167,11 @@ final class ViewerController: NSObject, WKNavigationDelegate, NSMenuItemValidati
         reloadHistoryMenu()
     }
 
+    /// Extensions rendered inside MdReader; everything else is handed to the system default app.
+    private static let markdownExts: Set<String> = [
+        "md", "markdown", "mdc", "mdx", "txt",
+    ]
+
     func openPath(_ raw: String) {
         let expanded = (raw as NSString).expandingTildeInPath
         var isDir: ObjCBool = false
@@ -179,9 +186,18 @@ final class ViewerController: NSObject, WKNavigationDelegate, NSMenuItemValidati
             showError("拒绝 URL，仅本地文件。")
             return
         }
+        let fileURL = URL(fileURLWithPath: expanded)
+        let ext = fileURL.pathExtension.lowercased()
+        // History / scheme may list pdf/office after hook expansion — open with system reader.
+        if !Self.markdownExts.contains(ext) {
+            NSWorkspace.shared.open(fileURL)
+            statusLabel.stringValue = "opened-system"
+            reloadHistoryMenu()
+            return
+        }
         currentPath = expanded
         titleLabel.stringValue = expanded
-        window.title = "\(MdReaderConstants.appName) — \(URL(fileURLWithPath: expanded).lastPathComponent)"
+        window.title = "\(MdReaderConstants.appName) — \(fileURL.lastPathComponent)"
         renderFile(at: expanded, reason: "open")
         startFileWatch(path: expanded)
         reloadHistoryMenu()
@@ -229,6 +245,13 @@ final class ViewerController: NSObject, WKNavigationDelegate, NSMenuItemValidati
 
         let ext = (path as NSString).pathExtension.lowercased()
         let isMarkdown = ["md", "markdown", "mdc", "mdx"].contains(ext)
+        // Directory of the opened file — relative images resolve against this file:// base.
+        let mdDir = URL(fileURLWithPath: path).deletingLastPathComponent().standardizedFileURL
+        // Must end with / so URL(relative, base) treats it as a directory.
+        var mdDirFileURL = mdDir.absoluteString
+        if !mdDirFileURL.hasSuffix("/") {
+            mdDirFileURL += "/"
+        }
 
         let body: String
         if isMarkdown {
@@ -248,11 +271,17 @@ final class ViewerController: NSObject, WKNavigationDelegate, NSMenuItemValidati
               document.querySelectorAll("pre code").forEach((block) => {
                 try { hljs.highlightElement(block); } catch (e) {}
               });
-              const base = \(jsString(URL(fileURLWithPath: path).deletingLastPathComponent().path + "/"));
+              // Resolve local image paths against the markdown file directory.
+              // Use the URL API (percent-encoding + ../) instead of string concat "file://" + path.
+              const base = \(jsString(mdDirFileURL));
               el.querySelectorAll("img[src]").forEach((img) => {
-                const s = img.getAttribute("src") || "";
-                if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("data:") || s.startsWith("file:")) return;
-                img.setAttribute("src", "file://" + base + s);
+                const s = (img.getAttribute("src") || "").trim();
+                if (!s) return;
+                if (/^(https?:|data:|file:|blob:)/i.test(s)) return;
+                try {
+                  // Relative (./a.png) or absolute path (/Users/…/a.png) vs file:// base of the .md dir
+                  img.setAttribute("src", new URL(s, base).href);
+                } catch (e) {}
               });
             })();
             </script>
@@ -266,10 +295,44 @@ final class ViewerController: NSObject, WKNavigationDelegate, NSMenuItemValidati
             bodyHTML: body,
             baseURL: resourceDir
         )
-        let base = URL(fileURLWithPath: path).deletingLastPathComponent()
-        webView.loadHTMLString(html, baseURL: base)
+        // loadHTMLString cannot reliably load sibling file:// images (WebKit origin rules).
+        // Write a temp HTML file and loadFileURL with read access spanning content + temp.
+        loadRenderedHTML(html, contentDirectory: mdDir)
         statusLabel.stringValue = reason == "watch" ? "hot-reload" : "loaded"
         titleLabel.stringValue = path
+    }
+
+    /// Load HTML via file URL so relative/local images under the content tree can load.
+    private func loadRenderedHTML(_ html: String, contentDirectory: URL) {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory
+            .appendingPathComponent("MdReader", isDirectory: true)
+            .appendingPathComponent("preview", isDirectory: true)
+        do {
+            try fm.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+            let file = tempRoot.appendingPathComponent("index.html")
+            try html.write(to: file, atomically: true, encoding: .utf8)
+            previewFileURL = file
+            let accessRoot = readAccessRoot(forContent: contentDirectory, tempHTMLDir: tempRoot)
+            webView.loadFileURL(file, allowingReadAccessTo: accessRoot)
+        } catch {
+            // Fallback: old path (images may still fail)
+            webView.loadHTMLString(html, baseURL: contentDirectory)
+        }
+    }
+
+    /// Directory WKWebView may read for subresources. Prefer home if both under it; else "/".
+    private func readAccessRoot(forContent contentDir: URL, tempHTMLDir: URL) -> URL {
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+        let c = contentDir.standardizedFileURL.path
+        let t = tempHTMLDir.standardizedFileURL.path
+        // Temp is usually /var/folders/... — not under home — so common root is often "/".
+        if c.hasPrefix(home.path + "/") || c == home.path,
+           t.hasPrefix(home.path + "/") || t == home.path
+        {
+            return home
+        }
+        return URL(fileURLWithPath: "/")
     }
 
     // MARK: - File watch (DispatchSource)
@@ -520,6 +583,9 @@ final class ViewerController: NSObject, WKNavigationDelegate, NSMenuItemValidati
 
         let config = WKWebViewConfiguration()
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        // Help file-scheme documents load local file subresources (images next to the .md).
+        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        config.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
         webView.setValue(false, forKey: "drawsBackground")
@@ -561,6 +627,7 @@ final class ViewerController: NSObject, WKNavigationDelegate, NSMenuItemValidati
             decisionHandler(.cancel)
             return
         }
+        // Subresource loads (images, css) and our loadFileURL document use .other / file:
         if url.scheme == "about" || navigationAction.navigationType == .other {
             decisionHandler(.allow)
             return
@@ -569,8 +636,18 @@ final class ViewerController: NSObject, WKNavigationDelegate, NSMenuItemValidati
             decisionHandler(.allow)
             return
         }
-        if let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+        // User-clicked http(s) links → open in system browser; do not navigate the viewer away.
+        if navigationAction.navigationType == .linkActivated,
+           let scheme = url.scheme?.lowercased(),
+           scheme == "http" || scheme == "https"
+        {
             NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+            return
+        }
+        if let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" {
+            decisionHandler(.cancel)
+            return
         }
         decisionHandler(.cancel)
     }

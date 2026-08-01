@@ -1,34 +1,80 @@
 {
-  "default": "md-reader",
+  "default": "system",
   "by_extension": {
     ".md": "md-reader",
     ".markdown": "md-reader",
+    ".mdc": "md-reader",
+    ".mdx": "md-reader",
     ".txt": "md-reader",
-    ".mdc": "md-reader"
+    ".pdf": "preview",
+    ".doc": "word",
+    ".docx": "word",
+    ".ppt": "powerpoint",
+    ".pptx": "powerpoint",
+    ".xls": "excel",
+    ".xlsx": "excel",
+    ".rtf": "system",
+    ".csv": "system",
+    ".html": "system",
+    ".htm": "system"
   },
   "apps": {
     "md-reader": {
-      "notes": "Companion WKWebView window (URL scheme md-reader://). Implemented in open_path.py, not a shell argv."
+      "bundle_id": "com.yanauto.mdreader",
+      "notes": "Companion WKWebView window. Cmd+click uses OS default; /open uses md-reader:// scheme."
     },
     "system": {
       "darwin": ["open"],
       "linux": ["xdg-open"]
     },
+    "preview": {
+      "bundle_id": "com.apple.Preview",
+      "darwin": ["open", "-a", "Preview"]
+    },
+    "word": {
+      "bundle_id": "com.microsoft.Word",
+      "darwin": ["open", "-a", "Microsoft Word"]
+    },
+    "powerpoint": {
+      "bundle_id": "com.microsoft.Powerpoint",
+      "darwin": ["open", "-a", "Microsoft PowerPoint"]
+    },
+    "excel": {
+      "bundle_id": "com.microsoft.Excel",
+      "darwin": ["open", "-a", "Microsoft Excel"]
+    },
     "typora": {
+      "bundle_id": "abnerworks.Typora",
       "darwin": ["open", "-a", "Typora"]
     },
     "obsidian": {
+      "bundle_id": "md.obsidian",
       "darwin": ["open", "-a", "Obsidian"]
     },
     "vscode": {
+      "bundle_id": "com.microsoft.VSCode",
       "darwin": ["open", "-a", "Visual Studio Code"]
     },
     "cursor": {
+      "bundle_id": "com.todesktop.230313mzl4w4u92",
       "darwin": ["open", "-a", "Cursor"]
-    },
-    "preview": {
-      "darwin": ["open", "-a", "Preview"]
     }
   },
-  "notes": "Copy to $GROK_PLUGIN_DATA/readers.json or ~/.config/grok-md-reader/readers.json and edit. default=md-reader uses the companion viewer when installed."
+  "os_defaults": {
+    "apply_extensions": [
+      ".md",
+      ".markdown",
+      ".mdc",
+      ".mdx",
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".ppt",
+      ".pptx",
+      ".xls",
+      ".xlsx"
+    ],
+    "notes": "install.sh applies these as macOS Launch Services defaults so Grok tool-line Cmd+click uses the same policy as /open. .txt/.html intentionally omitted (too broad). Copy to $GROK_PLUGIN_DATA/readers.json to customize."
+  },
+  "notes": "Single source of open policy: by_extension + apps.bundle_id. install → OS defaults; open_path.py → /open fallback."
 }

@@ -57,12 +57,41 @@ def test_session_list_accumulates_unique(tmp_path: Path):
     assert paths == [str(b.resolve()), str(a.resolve())]
 
 
-def test_ignores_non_md(tmp_path: Path):
+def test_ignores_code_and_binaries(tmp_path: Path):
     py = tmp_path / "x.py"
     py.write_text("x", encoding="utf-8")
     r = hook.process_payload(payload_write(str(py)), d=tmp_path)
     assert r is None
     assert not (tmp_path / "last_path").exists()
+
+
+def test_records_pdf(tmp_path: Path):
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    r = hook.process_payload(payload_write(str(pdf), "sess-pdf"), d=tmp_path)
+    assert r is not None
+    assert (tmp_path / "last_path").read_text(encoding="utf-8").strip() == str(pdf.resolve())
+    cur = json.loads((tmp_path / "history" / "current.json").read_text(encoding="utf-8"))
+    assert str(pdf.resolve()) in cur["paths"]
+
+
+def test_records_docx(tmp_path: Path):
+    docx = tmp_path / "note.docx"
+    docx.write_bytes(b"PK")
+    r = hook.process_payload(payload_write(str(docx), "sess-doc"), d=tmp_path)
+    assert r is not None
+    assert "note.docx" in (tmp_path / "last_path").read_text(encoding="utf-8")
+
+
+def test_history_mixes_md_and_pdf(tmp_path: Path):
+    md = tmp_path / "a.md"
+    pdf = tmp_path / "b.pdf"
+    md.write_text("# a\n", encoding="utf-8")
+    pdf.write_bytes(b"%PDF\n")
+    hook.process_payload(payload_write(str(md), "mix"), d=tmp_path)
+    hook.process_payload(payload_write(str(pdf), "mix"), d=tmp_path)
+    cur = json.loads((tmp_path / "history" / "current.json").read_text(encoding="utf-8"))
+    assert cur["paths"] == [str(md.resolve()), str(pdf.resolve())]
 
 
 def test_ignores_other_tools(tmp_path: Path):

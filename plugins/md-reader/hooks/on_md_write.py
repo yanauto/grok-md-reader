@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""PostToolUse side-channel: record last_path + session md list (no visible output).
+"""PostToolUse side-channel: record last_path + session readable-file list (no visible output).
+
+Tracks markdown and common document types (pdf/office/txt/…). Code/binaries are ignored.
 
 Disable: MD_READER_HOOK_DISABLE=1|true|yes  OR  touch $data_dir/hook_disabled
 """
@@ -11,6 +13,26 @@ import os
 import sys
 from pathlib import Path
 
+# Readable / document types we route or surface in history (not code, not archives).
+TRACKED_EXTS = {
+    ".md",
+    ".markdown",
+    ".mdc",
+    ".mdx",
+    ".txt",
+    ".rtf",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".ppt",
+    ".pptx",
+    ".xls",
+    ".xlsx",
+    ".csv",
+    ".html",
+    ".htm",
+}
+# Back-compat alias for tests / callers that still import MD_EXTS
 MD_EXTS = {".md", ".markdown", ".mdc", ".mdx"}
 MAX_HISTORY = 50
 
@@ -73,6 +95,11 @@ def extract_path(payload: dict) -> str | None:
 
 def is_markdown(path: str) -> bool:
     return Path(path).suffix.lower() in MD_EXTS
+
+
+def is_tracked(path: str) -> bool:
+    """True for document types we record in last_path / session history."""
+    return Path(path).suffix.lower() in TRACKED_EXTS
 
 
 def normalize_path(path: str, cwd: str | None) -> str:
@@ -160,7 +187,7 @@ def process_payload(payload: dict, d: Path | None = None) -> dict | None:
         return None
 
     path = extract_path(payload)
-    if not path or not is_markdown(path):
+    if not path or not is_tracked(path):
         return None
 
     path_s = normalize_path(path, payload.get("cwd"))

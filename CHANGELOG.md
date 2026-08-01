@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Install-and-click**: `./install.sh` applies macOS default apps from `readers.example.json` (`.md`→MdReader, `.pdf`→Preview, Office when present) so Grok tool-line Cmd+click works without agent skill
+- `apply_os_defaults.py` + Launch Services helper; `--doctor` / `--set-defaults` / `--no-set-defaults`
+- `/open` and skill reframed as **fallback** for plain-text paths
+- ADR-0002; README / ARCHITECTURE updated
+
 ## 0.3.0 — 2026-07-26
 
 Open-source release (Phase 4).

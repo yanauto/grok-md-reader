@@ -1,117 +1,112 @@
 ---
-description: 完整收尾——更新项目状态(vitals proj now)/ 写收尾事件(proj log)/ 检查待沉淀的 ADR。用户显式调用，或口头表达结束意图、AI 问一句得到肯定答复后调用（确认闸门）。
+description: 完整收尾——proj now/log、操作晋升、工程日文件、可选 ADR/kb。用户显式调用或口头结束经确认后执行。
 ---
 
-执行收尾流程（不要省略任何步骤）。v4.0 起项目实况在 projects.db（`vitals proj` 命令族），叙事仍是 docs/ 下的 md。
+执行收尾（不要省略步骤）。  
+**控制面**（vitals）：仪表盘 now + 分层事件 log。  
+**内容面**（md）：地图/手册/playbooks/ADR/日文件。  
+详见 vitals 设计：`控制面对齐工程记忆v5`（长步骤永不进库）。
 
-## 1. 总结本次对话
+## 1. 总结本场
 
-回想这一整个会话：
-- **做了什么具体的事**（写代码 / 设计 / 决策 / 调试）
-- **产生了什么决策**（如果有「我决定」「最终方案是」「不要 X」之类）
-- **当前卡住的事**（如果有）
-- **下一步该做啥**
+- 做了什么（代码/设计/调试/运维）  
+- 决策信号（「决定」「最终」「不要」…）  
+- 卡住的事  
+- 下一步  
+- **是否首次打通或修正了可复跑路径**（部署/回灌/联调/装机…）
 
-## 2. 更新项目状态（`vitals proj now`）
+## 2. 更新 `vitals proj now`（瘦身骨架 · 配合 vitals 工单）
 
-```bash
-vitals proj now grok-md-reader --set "<现在的状态>" --next "<下一步>"
-```
-
-- `--set`（现在的状态）：本次会话后项目处在哪——一两句话；**有卡住的事写在这里**（「卡住:...」前缀）
-- `--next`（下一步）：最多 3 条，用「;」分隔，按优先级
-
-### 2.1 --next 质量自检（重要）
-
-每条必须含：
-
-1. **明确动词**（修改 / 实现 / 添加 / 删除 / 调试 / 验证 / 重构）
-2. **明确对象**（具体文件、函数、模块名）
-3. **明确位置或验证标准**（行号 / 测试名 / 验收 criteria）
-
-✅ 好例子：「修改 src/lib/watermark.ts:42 的 SVG 渲染让 transparency 生效,验证跑 test/watermark.test.ts」
-❌ 烂例子（必须重写）：「优化水印渲染」「完善功能」「继续上次」「修 bug」
-
-**抽象 next 等于没 next**——下次开窗时 AI 看不懂具体要做什么，整套机制失效。实在不知道具体下一步，写「先评估:[要回答什么问题]→然后才能决定」。
-
-## 3. 写事件流（`vitals proj log`）
-
-### 3.1 收尾摘要（每次 wrap-up 必写一条）
+**禁止**把本场流水账塞进 `--set`。固定骨架：
 
 ```bash
-vitals proj log grok-md-reader "<本次会话干了什么,1-2 句>" --action session
+vitals proj now grok-md-reader \
+  --set "状态: <≤2 句现行能力/环境>；卡住: <无|具体阻塞>" \
+  --next "<动词+对象+验证1>; <动词+对象+验证2>"
 ```
 
-这条是跨项目可见的"今天这个项目发生了什么"，**每次收尾都写**，写实不写虚。
+- `--next` 最多 3 条；每条必须：**动词 + 对象 + 位置或验证**  
+- 抽象 next（「继续优化」「完善」）= 没 next，必须重写  
 
-### 3.2 显著进展（按显著性判断,0-N 条）
+## 3. 事件流
 
-只在出现以下任一情况时**另外**追加带 tag 的 log 事件：
-- 完成了 feature 的一个**阶段**（能跑通某场景,不是"写了几行"）
-- 修了一个**关键** bug（影响主流程）
-- 做了一次**重构**（代码组织变化）
-- 设定了一个**新的工程约定**
+### 3.1 收尾摘要（必写）
 
 ```bash
-vitals proj log grok-md-reader "[FEATURE] 完成 batch-upload 阶段 2:批量预览缩略图、错误重试"
-vitals proj log grok-md-reader "[FIX] 修 iOS Safari 上 ImageBitmap 失败的 fallback"
+vitals proj log grok-md-reader "<本场干了什么,1-2句>" --action session
 ```
 
-可用 tag：`[FEATURE]` / `[FIX]` / `[REFACTOR]` / `[CONVENTION]`（`[DECISION]` 由第 4 步的 ADR 流程写,不在这里重复）。
-调样式/改文案/探索性尝试**不追加**——判断不准时偏向不追加。
+### 3.2 显著进展（0-N）
 
-## 4. 决策检测与自动沉淀
+阶段完成 / 关键 bug / 重构 / 新工程约定 才追加，带 `[FEATURE]`/`[FIX]`/`[REFACTOR]`/`[CONVENTION]`。
 
-回顾本次对话，扫这些信号：
-- 用户明确说「我决定 X」「最终方案是 Y」「不要 Z」「就用 W」
-- 经过权衡讨论达成结论
-- 设定了适用于未来的规则
+### 3.3 OPS 指针（有操作晋升时必写 · 控制面 `action=ops`）
 
-**检测到的决策列成清单，一次性问用户（确认制）**：
+本场若更新了地图入口 / playbook / 工程手册中的**可复跑路径**，额外：
 
-> 本场检测到 N 个待沉淀决策：
-> 1. [一句话概括] / 2. [一句话概括] / …
-> 沉淀哪些为 ADR？（全部 / 说编号 / 都不）
+```bash
+vitals proj log grok-md-reader "<一句话动作> → <仓库内相对路径>" \
+  --action ops \
+  --report-ref "<同上相对路径>"
+```
 
-**为什么确认制**：ADR 是 append-only 永不删除——误沉淀一次就是永久噪音。
+- CLI 会自动给 summary 补 `[OPS]` 前缀；箭头后的 path 可自动抽到 `report_ref`（显式 `--report-ref` 更稳）  
+- 例：`… "scout-web 回灌 → docs/playbooks/scout-web-deploy.md" --action ops`  
+- 查询：`vitals proj recent --project grok-md-reader --action ops --pretty`  
+无新路径：不写本条。
+## 4. 决策 → ADR（确认制）
 
-用户确认后逐条写入：
-- 命名：按 `docs/decisions/` 现有最大编号 +1 递增，`NNNN-kebab-title.md`（叙事正文留在 md，**不进库**）
-- 格式：套用现有 ADR 结构；首次参考 `docs/decisions/README.md` 模板
-- 取代关系：新 ADR「相关」里声明「取代 ADR-XXXX」，**绝不修改**旧 ADR 文件
-- 联动：每写一条 ADR，写一条决策指针事件（正文在 md,库里只存指针）：
-  ```bash
-  vitals proj log grok-md-reader "ADR-NNNN: <标题一句话>" --action decision
-  ```
+列清单问用户沉淀哪些；确认后写入 `docs/decisions/NNNN-….md`，并：
 
-**弱信号不算**（「也许」「或许」「可以考虑」「先看看」），连清单都不进——宁可漏记也不误沉淀。
+```bash
+vitals proj log grok-md-reader "ADR-NNNN: <标题>" --action decision
+```
 
-## 4.5 可复用知识入池（确认制）
+弱信号不进清单。
 
-回顾本场:有没有摸出**别的项目也用得上的操作办法**（连某服务器/调某接口/某内网穿透姿势/某系统在哪…）？有就问一句：
+## 5. 操作晋升（v5 硬闸）
 
-> 本场摸出「X 怎么做」,要登记进跨项目知识池吗？
+若本场**首次打通或修正**可复跑路径：
 
-确认后：`vitals kb add "<标题>" --project grok-md-reader --tags <标签> --body "<步骤>"`（**密钥绝不写进正文,只写指针**如「凭证在 compny/secrets/xxx」）。本项目专属的套路不入池,留在项目铁律或 ADR。
+1. 更新 `docs/代码地图.md` 操作入口表（一行），和/或  
+2. 新建/更新 `docs/playbooks/<动作>.md`，和/或  
+3. 更新 `docs/工程手册.md` 相关节  
+4. **立刻写 §3.3 `[OPS]` log**（指向上述文件）  
 
-## 5. 报告
+密钥只写 vault 指针。  
+若无新路径：在日记里写「无新路径晋升」。
+
+**禁止**只在 log/日记写「部署完成」而不留可复跑入口 + OPS 指针。
+## 6. 跨项目知识池（确认制）
+
+摸出**别的项目也用得上**的做法 → 问是否 `vitals kb add`（`--project grok-md-reader`，密钥不进池）。
+
+## 7. 工程日记（一天一文件）
+
+路径：`docs/sessions/YYYY-MM-DD.md`（UTC+8 当天）。
+
+- 不存在 → 新建：`# YYYY-MM-DD · 日汇总` + 主题索引 + `## 场 1 · …`  
+- 已存在 → 追加下一场，更新顶部索引  
+
+场内短篇即可：主题 / 要点（含是否晋升）/ 下次。  
+**无周记、无月记。**
+
+## 8. 报告
 
 ```
 ✅ 收尾完成
-- 状态已更新（下一步: [一句话概括]）
-- 事件流: 1 条 session + N 条显著进展
-- 决策沉淀: X 条 ADR（或: 无）
-- raw transcript 会在 SessionEnd 时自动备份
-
-下次新窗口 SessionStart hook 会自动注入状态与近 7 天事件。
+- proj now：状态/卡住/next（已瘦身）
+- 事件：session ± tag ± [OPS]
+- 操作晋升：有（文件 + OPS log）/ 无
+- 日记：docs/sessions/YYYY-MM-DD.md 第 N 场
+- ADR：N 条 / 无
+- kb：N 条 / 无
 ```
 
 ## 约束
 
-- ❌ 不**主动** git commit——用户明确要求才提交;项目没用 git 就忽略本条（是否用 git 是各项目自己的事）
-- ✅ 第 4 步检测到的决策经用户**批量确认后**写成新 ADR
-- ❌ 不要修改 `docs/decisions/` 下任何已存在文件
-- ✅ `--set`/`--next` 是覆盖语义,写完整状态,不写增量
-- ✅ **--next 每条必须有动词 + 对象 + 位置/验证**（见 2.1）
-- ✅ session 事件每次必写;tag 事件只在显著进展时写（见 3.2）
-- ✅ vitals 命令失败（非零退出）→ 如实报告用户,不假装写成功;别重试超过一次
+- 不主动 git commit（用户要求才提交）  
+- 不修改已有 ADR 文件  
+- `--set`/`--next` 覆盖语义  
+- vitals 失败如实报告，不装成功  
+- `/checkpoint` 已废止，本命令是唯一收尾入口  

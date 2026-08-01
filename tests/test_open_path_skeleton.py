@@ -70,12 +70,65 @@ def test_dry_run_force_system():
     assert str(README) in r.stdout
 
 
-def test_print_config():
-    r = run(["--print-config"])
+def test_print_config(tmp_path):
+    # Pin data dir empty so we load repo example, not a local $GROK_PLUGIN_DATA/readers.json
+    env = {
+        "GROK_PLUGIN_DATA": str(tmp_path),
+        "GROK_PLUGIN_ROOT": str(ROOT / "plugins" / "md-reader"),
+    }
+    r = run(["--print-config"], env=env)
     assert r.returncode == 0
     data = json.loads(r.stdout)
     assert "default" in data
     assert data["default"] in ("md-reader", "system")
+    by_ext = data.get("by_extension") or {}
+    assert by_ext.get(".md") == "md-reader"
+    assert by_ext.get(".pdf") == "preview"
+    assert by_ext.get(".docx") == "word"
+
+
+def test_dry_run_pdf_routes_to_preview(tmp_path):
+    pdf = tmp_path / "sample.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    env = {
+        "GROK_PLUGIN_DATA": str(tmp_path / "data"),
+        "GROK_PLUGIN_ROOT": str(ROOT / "plugins" / "md-reader"),
+    }
+    r = run(["--dry-run", str(pdf)], env=env)
+    assert r.returncode == 0, r.stderr
+    out = r.stdout
+    assert "DRY-RUN" in out
+    assert "Preview" in out
+    assert str(pdf) in out
+    assert "md-reader://" not in out
+
+
+def test_dry_run_docx_routes_to_word(tmp_path):
+    docx = tmp_path / "note.docx"
+    docx.write_bytes(b"PK\x03\x04")  # minimal zip-ish stub; open not invoked
+    env = {
+        "GROK_PLUGIN_DATA": str(tmp_path / "data"),
+        "GROK_PLUGIN_ROOT": str(ROOT / "plugins" / "md-reader"),
+    }
+    r = run(["--dry-run", str(docx)], env=env)
+    assert r.returncode == 0, r.stderr
+    assert "DRY-RUN" in r.stdout
+    assert "Microsoft Word" in r.stdout
+    assert "md-reader://" not in r.stdout
+
+
+def test_dry_run_unknown_ext_routes_to_system(tmp_path):
+    blob = tmp_path / "data.bin"
+    blob.write_bytes(b"\x00\x01")
+    env = {
+        "GROK_PLUGIN_DATA": str(tmp_path / "data"),
+        "GROK_PLUGIN_ROOT": str(ROOT / "plugins" / "md-reader"),
+    }
+    r = run(["--dry-run", str(blob)], env=env)
+    assert r.returncode == 0, r.stderr
+    # plain open / xdg-open + path; not MdReader scheme
+    assert "md-reader://" not in r.stdout
+    assert str(blob) in r.stdout
 
 
 def test_preview_without_last_path(tmp_path, monkeypatch):

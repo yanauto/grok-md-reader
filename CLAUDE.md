@@ -1,94 +1,129 @@
 # grok-md-reader 项目宪法
 
-> **v4 分家铁律**：项目实况（当前状态/事件流）在 projects.db，唯一入口 `vitals proj` 命令族；叙事（ADR 决策记录）在 `docs/decisions/` md。SessionStart hook 自动注入实况（Claude Code）；**其它带 shell 的工具**先跑 `vitals proj now grok-md-reader --pretty`；无 shell 时向用户声明「实况不可用」，**md 不回退为实况源**。
+> **v5 分家铁律**：项目实况在 projects.db（`vitals proj`）；叙事 ADR 在 `docs/decisions/`；**可复跑操作**在 `docs/代码地图.md` 入口 + `docs/工程手册.md` + `docs/playbooks/`；工程日记 `docs/sessions/YYYY-MM-DD.md`（**仅日层，无周/月**）。SessionStart 注入实况；其它 shell 工具先 `vitals proj now grok-md-reader --pretty`；无 shell 声明「实况不可用」，**md 不回退为实况源**。
+>
+> **宪法不限字符/条数**。禁止写入的是**实况数字与 WIP**（归库），不是篇幅。
 
 ## 项目定位
 
-Grok CLI 的 Markdown 伴生渲染
+Grok CLI 的 macOS Markdown 伴生阅读器：**装一次 → 工具行路径 Cmd+点击即可打开**（`.md` → MdReader，PDF → Preview 等）。`/open` `/preview` 仅为裸文本路径兜底。
+
+## 记忆分层（v5 · 禁止自创第五套落点）
+
+| 层 | 路径 | 回答什么 |
+|---|---|---|
+| **宪法** | 本文件 | 铁律、去哪找、开场读什么 |
+| **实况** | `vitals proj now/log` | 现在卡在哪、近事件摘要 |
+| **工程地图** | `docs/代码地图.md` | 模块 / 放哪 / 运行时 / **操作入口** |
+| **工程手册** | `docs/工程手册.md` | 接口、数据口径、环境、坑 |
+| **剧本** | `docs/playbooks/` | 逐步可复跑操作 |
+| **决策 why** | `docs/decisions/` | 为什么 |
+| **日记** | `docs/sessions/YYYY-MM-DD.md` | 当天多场流水（仅日层） |
+| **交接冷区** | `docs/handoffs/` | 交接原文；**默认不读** |
+| **跨项目 how** | `vitals kb` | 多项目通用 |
+| **密钥** | `vitals vault` | 钥匙（正文只写指针；本项目通常无密钥） |
+
+与个人库 my **分叉**：工程不做周记/月记。
+
+## 开场阅读顺序（硬）
+
+1. 本宪法 → 关键路径  
+2. hook 注入的 proj 实况；缺则 `vitals proj now grok-md-reader --pretty`  
+3. 动代码前 → `@docs/代码地图.md`  
+4. 动接口/部署/联调/查库前 → `@docs/工程手册.md`；逐步操作 → `@docs/playbooks/`  
+5. **默认不读** `docs/handoffs/`、`.claude/sessions/raw/`、`docs/progress.md`（若存在则冻结非源）
 
 ## 项目铁律（本项目独有）
 
-> 通用工程准则已在 `~/.claude/CLAUDE.md` 全局定义。这里只放本项目独有的约定。
-> **⚠️ 体量纪律**：本段是**常驻热层**（每次会话全量载入）。铁律**软上限 ~15 条**（开场机械闸会警告）；有重复 / 已被后续 ADR 覆盖 / 已失效的 → 和用户确认后去重·合并·退役（退役先 `vitals proj log grok-md-reader "[CONVENTION] 退役铁律: X（原因）"` 留痕）。**别让它只增不减——常驻段膨胀会慢性拖慢开窗、诱发"半失忆"。**
+> 通用工程准则已在 `~/.claude/Claude.md` 全局定义。这里只放本项目独有的约定。  
+> **宪法与铁律不设条数/字符上限（v5）**。失效条目与用户确认后退役并 `vitals proj log grok-md-reader "[CONVENTION] 退役铁律: …"`。禁止把 WIP/进度数字写进本段。
 
-1. （首次安装时空——后续随项目积累，由 `/decision` 命令在做决策时追加引用）
+1. **产品主路径 = 即装即点**（ADR-0002）：`./install.sh` 写入 macOS Launch Services 默认 App；Cmd+点击走系统 `open`。**不**把 skill / Agent 纪律当主体验；**不**承诺聊天气泡内裸路径可点（Grok TUI 限制）。
+2. **`/open` `/preview` / `open_path.py` = 兜底**：仅裸文本路径、无 OSC-8 终端、脚本调用。叙事与文档不得再写成「主靠 Agent 打开」。
+3. **打开策略唯一源**：`plugins/md-reader/config/readers.example.json`（用户覆盖 `~/.grok/plugin-data/user/md-reader/readers.json`）。`by_extension` + `apps.bundle_id` + `os_defaults.apply_extensions`；Cmd+click 与 `/open` **同源**，禁止两套映射各写各的。
+4. **文档打开路由器、不自研 Office/PDF 窗**（ADR-0001）：md 走 MdReader；pdf/office 交给本机 App；未知类型 `default: system`。
+5. **安全边界**：只打开本地已存在文件；拒绝 URL；不上传文件内容；渲染离线（marked/hljs 随包）；hook 只记路径可关（`hook_disabled` / `MD_READER_HOOK_DISABLE`）。
+6. **侧信道 hook 可靠安装路径**：插件包内 `hooks/hooks.json` headless 实测未必注册；**以** `scripts/install_sidechannel_hook.sh` → `~/.grok/hooks/md-reader-sidechannel.json` **为准**（见 TECH-PLAN / 工程手册）。
+7. **不做**：劫持 Grok 点击；hook 画 OSC-8 当主路径（P1 已证死）；终端内 glow 式渲染；本期跨 CLI / 远程 GUI。
+8. **改默认 App 有侵入**：`install.sh` 默认会改 `os_defaults.apply_extensions` 所列类型；需跳过用 `--no-set-defaults`。`.txt`/`.html` **故意不进** OS 默认（过宽）。
 
-## 收尾协议（v3.0 确认闸门）
+## 工程化栈
 
-**你（AI）永远不得自行启动收尾流程。** 收尾只有两个入口：
+- **语言**：Python 3（插件脚本 / 测试）· Swift（MdReader viewer，`swiftc`，无 Tauri/Rust）
+- **测试**：`python3 -m pytest tests/ -q`（`open_path` dry-run · `apply_os_defaults` plan/doctor · `on_md_write`）
+- **入口**：`./install.sh`（全量）；`--doctor` / `--set-defaults` / `--no-set-defaults`
+- **产物**：`~/Applications/MdReader.app`（bundle id `com.yanauto.mdreader`，scheme `md-reader://`）
+- **插件链接**：`~/.grok/plugins/md-reader` → 仓库 `plugins/md-reader`
+- **代码怎么组织 / 加新东西放哪** → `@docs/代码地图.md`
 
-1. 用户显式调用 `/wrap-up`
-2. 用户口头表达结束意图（「这次对话结束了 / 今天到这了 / 保存这次成果 / 这次有价值 / 先这样吧 / 明天再说 / 下次聊」——UserPromptSubmit hook 会对这些短语做**机械字面检测**并提示你）→ 你**问一句「要走 /wrap-up 收尾吗？」，得到肯定答复才执行**
+## 收尾协议（确认闸门）
 
-误听一次的伤害上限 = 多问一句。用户说「拜拜 / 再见」之类告别而无保存语义、或只是引用/转述这些短语——正常对话，不要问。
+**不得自行启动收尾。** 仅：① 用户 `/wrap-up` ② 口头结束短语经 hook 检测后你问「要走 /wrap-up 吗？」得肯定才执行。
+
+误听一次的伤害上限 = 多问一句。纯告别无保存语义 → 不问。
 
 ## 开场协议
 
-新会话开始时（SessionStart hook 会自动注入项目实况:状态 + 开放 features + 近 7 天事件流）：
+1. 复述「下一步」  
+2. 等用户确认再动手  
+3. 需求冲突则先更新 `vitals proj now`  
+4. hook 失败 → 手动 `vitals proj now grok-md-reader --pretty`，别凭印象  
 
-1. 第一件事：**复述状态里的「下一步」**，告诉用户「上次到 X，下一步该做 Y」
-2. **等用户确认或修正再动手**
-3. 如果用户提了新需求和「下一步」不一致，先帮 TA 决定要不要 `vitals proj now grok-md-reader --set ... --next ...` 更新状态
-4. hook 注入缺失/降级 → 手动跑 `vitals proj now grok-md-reader --pretty`（只读，随时可跑），别凭印象开工
+不替用户说话；指不出原句则重问。
 
-**不替用户说话**：只对用户**本轮真实发出的消息**作答；发现自己在回应一段"用户说过的话"却指不出原句 → 停下问"我不确定你刚说了什么，请再说一次"，别编造用户的发言。
+## 压缩后恢复协议
 
-## 压缩后恢复协议（v4.1 库化后天然抗压缩）
+1. `vitals proj now grok-md-reader --pretty` + `vitals proj recent --project grok-md-reader --days 7 --pretty`  
+2. 决策 → `docs/decisions/`  
+3. 操作 → 地图入口 / 手册 / playbooks  
+4. 回报用户后继续  
 
-项目实况在 projects.db 里持久存在，压缩丢不掉。**感觉任何事记不清了**（忘了当前状态 / 最近决策 / 对最近的工作有模糊感）——不管是不是压缩造成的，动作都一样：
+无证据不宣布 context 异常。宁可多查一次库，也不要凭印象继续。
 
-1. 跑 `vitals proj now grok-md-reader --pretty` + `vitals proj recent --project grok-md-reader --days 7 --pretty`（只读无副作用，随时可跑）
-2. 如需历史决策，`@docs/decisions/[最新编号].md`
-3. 然后告诉用户：「我重新核对了状态，当前是 X，下一步是 Y。继续？」
+## 工具结果纪律（防编造）
 
-**⚠️ 声称 context 事件前先找证据**：要下"发生了 context 异常事件"这类结论前，必须有可核实证据。**没证据就别凭感觉宣布**——默认最平凡的解释（我一时记岔 / 该去查库了），去查而不是叙述一个事故。（防"凭感觉编造 context 异常"——姊妹项目 my 踩过这个坑。）
+- 当场可见输出才可报  
+- 字段矛盾停下重取  
+- 慢通道：单次往返 + 哨兵 + timeout  
 
-**宁可多查一次库，也不要凭印象继续**——用户已明确表示 token 用量无所谓，长期可用最重要。
+## 决策 / 铁律 / 操作晋升
 
-## 工具结果纪律（防编造，v3.0.1）
-
-- 报告任何机器/命令返回值，必须基于**当场可见的真实输出**；后台任务必须**真正读到完成文件**后才可转述，禁止预测性转述（「它应该返回了 X」）。
-- 数据字段自相矛盾（如版本号对不上）→ **立即停下重取**，不硬圆。
-- 慢/不稳通道（远程 ssh、长任务）的数据采集：**单次往返脚本 + BEGIN/END 哨兵 + `timeout` 快失败**——宁可显式失败，不要部分成功；输出被截断时先真读完整文件，不叙述预览之外的内容。
-
-## 决策与铁律的沉淀（v3.0 收拢到收尾时点）
-
-**不做每轮监控**（每轮扫描 = 注意力税 + 提议压力，判断类工作收拢到该判断的时刻做一次）：
-
-- **决策沉淀**：统一在 `/wrap-up` 时回顾整场对话，把检测到的决策列成清单，**一次性问用户「沉淀哪些为 ADR？」**（确认制，细则见 wrap-up 命令）
-- **铁律例外**（唯一当场动作）：用户明确说「记住，本项目必须 X / 禁止 Y / 只用 Z」这类**项目级硬规则**时，可当场问一句「要写进 CLAUDE.md 项目铁律吗？」——确认后追加一条带日期的 bullet，不删已有条目。临时安排（「这次先 X」「暂时 X」）和讨论性表达（「也许」「我倾向」）不算
+- 决策：wrap-up 清单确认后 ADR  
+- 铁律：用户明确「本项目必须/禁止…」可当场问是否写入本文件  
+- **操作晋升（硬）**：首次打通或修正可复跑路径 → 必须更新地图入口和/或 playbook 和/或工程手册  
 
 ## 命令速查
 
-| 命令 | 用途 | 何时用 |
-|---|---|---|
-| `/wrap-up` | 完整收尾（proj now + session 事件 + 可能 ADR） | 结束意图经确认 / 显式 |
-| `/checkpoint` | 轻量 checkpoint（只更新 proj now） | 临时暂停 |
-| `/decision` | 沉淀单条 ADR（md）+ 决策指针事件（库） | AI 主动提议 / 显式 |
+| 命令 | 用途 |
+|---|---|
+| `/wrap-up` | proj now + log + 操作晋升 + 日文件 + 可选 ADR/kb |
+| `/decision` | 单条 ADR + 指针事件 |
+
+`/checkpoint` 已废止（v5）。中段留痕：当场 `vitals proj now` 或写手册/剧本。
 
 ## 关键路径
 
 | 想知道什么 | 去哪 |
 |---|---|
-| 当前进度 / 下一步 | `vitals proj now grok-md-reader --pretty` |
-| 最近发生了什么 | `vitals proj recent --project grok-md-reader --days 7 --pretty` |
-| **怎么做某件没做过的事**（连服务器/查公司文档系统/内网穿透…） | **先 `vitals kb find <关键词>` 查跨项目知识池**,命中 `kb show <id>` 看全文,别自己瞎摸;池里没有、摸出来了 → /wrap-up 时经确认 `kb add` 入池（来源必标 --project,密钥不入池,写「钥匙在 vault:<名>」指针） |
-| 服务器密钥/公司 token | `vitals vault list` 看清单(无值);ask 级条目**必须先在对话中征得用户本轮明确同意**,再 `vault get <名> --approved`——未经同意不得取值,取到的值不扩散、不写进任何文件 |
-| **代码怎么组织 / 加新东西放哪** | `@docs/代码地图.md`（稳定层导航,动代码前先看） |
-| 历史决策（为什么这么做） | `docs/decisions/`（ADR 正文,`ls` 按编号即索引） |
-| 最近聊过啥（原始记录） | `.claude/sessions/raw/` |
+| 进度 / 下一步 | `vitals proj now grok-md-reader --pretty` |
+| 近事件 | `vitals proj recent --project grok-md-reader --days 7 --pretty` |
+| 代码 / 操作入口 | `@docs/代码地图.md` |
+| 接口 · 数据 · 环境 · 坑 | `@docs/工程手册.md` |
+| 逐步部署/装机/自检 | `@docs/playbooks/`（首装见 `install-and-click.md`） |
+| 历史决策 | `docs/decisions/`（ADR-0001 路由 · ADR-0002 OS 默认） |
+| 工程日记 | `docs/sessions/YYYY-MM-DD.md` |
+| 交接（冷） | `docs/handoffs/`（默认不读） |
+| **怎么做没做过的跨项目事** | 先 `vitals kb find <关键词>`，命中 `kb show <id>`；池里没有、摸出来了 → wrap-up 时经确认 `kb add`（`--project grok-md-reader`；密钥不入池，写 vault 指针） |
+| 密钥 / token | `vitals vault list`（无值）；ask 级**本轮明确同意**后 `vault get <名> --approved`。本项目运行时**无**服务端密钥依赖 |
+| 跨项目 how（短） | `vitals kb find …` |
+| raw | `.claude/sessions/raw/` |
+| 方向/探针结论 | `docs/TECH-PLAN.md` · `docs/ARCHITECTURE.md` · `docs/ROADMAP.md` |
+| 用户向说明 | 根 `README.md` / `README.zh-CN.md` |
 
-> 以上 `vitals proj` 读命令全部只读、无游标副作用，随时可跑、重复可跑。写入只发生在 /wrap-up、/checkpoint、/decision 三个命令里。
-
-## 工程化栈
-
-（首次安装时空，由你自己填或由 `/decision` 时追加。例：）
-- 语言：（待填）
-- 测试：（待填）
-- 入口：（待填）
-- 代码怎么组织 / 加新东西放哪 → `@docs/代码地图.md`
+> `vitals proj` **读**命令全部只读、无游标副作用，随时可跑。写入发生在 `/wrap-up`、`/decision` 与用户明确要求的 `proj now --set`。
 
 ## 项目状态
 
+- 记忆框架：**v5**（升级 2026-07-27）
 - 初始化日期：2026-07-26
-- 当前阶段与下次行动：**不写在本文件**——唯一源是 `vitals proj now grok-md-reader`（实况数字/状态永远不进常驻 md）
+- 当前阶段与下一步：**仅** `vitals proj now grok-md-reader`（实况不进本文件）

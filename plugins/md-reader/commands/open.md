@@ -1,15 +1,28 @@
 ---
-description: Open a local file (usually .md) in the MdReader companion window
+description: Open a local document (fallback when Cmd+click is unavailable)
 argument-hint: <path>
 ---
 
 # /open
 
-Open the given local path with the **md-reader** helper（默认唤起 MdReader 伴生渲染窗）。
+**Fallback** when the path is not a Cmd+clickable tool-line `file://` link.
+
+After `./install.sh`, the primary path is: **Cmd+click** a path on a Grok
+tool line → system open → OS defaults (`.md` → MdReader, `.pdf` → Preview, …).
+
+Use `/open` for plain chat text paths, Terminal.app without OSC-8, or when
+the user asks you to open a file.
+
+Helper routing (same policy as install defaults):
+
+- **Markdown / text** → MdReader
+- **PDF** → Preview
+- **Word / PPT / Excel** → installed Office apps; else system default
+- **Unknown** → system `open`
 
 ## Arguments
 
-- `$ARGUMENTS` — relative or absolute path to a file (prefer `.md` / `.markdown` / `.txt`)
+- `$ARGUMENTS` — relative or absolute path to a local file
 
 ## Steps
 
@@ -27,11 +40,13 @@ If `GROK_PLUGIN_ROOT` is unset (dev mode), from the plugin package root:
 python3 skills/open-md/scripts/open_path.py -- <path>
 ```
 
-4. Report success (`opened (md-reader): …`) or the helper's error. Do not invent paths.
+4. Report success (`opened (…): …`) or the helper's error. Do not invent paths.
 5. On success the helper records the path for `/preview`.
 
 ## Notes
 
 - Never open remote URLs.
-- Never execute the markdown content.
-- Viewer missing? hint user: `./viewer/scripts/build_app.sh --install`
+- Never execute file content.
+- Mapping: `config/readers.example.json` or `$GROK_PLUGIN_DATA/readers.json`.
+- OS defaults broken? `./install.sh --set-defaults` or `./install.sh --doctor`.
+- Viewer missing? `./viewer/scripts/build_app.sh --install`

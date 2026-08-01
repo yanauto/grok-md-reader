@@ -25,8 +25,9 @@ def plugin_root() -> Path:
     env = os.environ.get("GROK_PLUGIN_ROOT") or os.environ.get("CLAUDE_PLUGIN_ROOT")
     if env:
         return Path(env).expanduser().resolve()
-    # skills/open-md/scripts/thisfile → plugin root is parents[2]
-    return Path(__file__).resolve().parents[2]
+    # skills/open-md/scripts/thisfile → plugin root is parents[3]
+    # (scripts → open-md → skills → md-reader)
+    return Path(__file__).resolve().parents[3]
 
 
 def repo_root_guess() -> Path | None:
@@ -71,7 +72,7 @@ def load_readers_config() -> dict:
                 return json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
-    return {"default": "md-reader", "by_extension": {}, "apps": {}}
+    return {"default": "system", "by_extension": {}, "apps": {}}
 
 
 def resolve_target(path_s: str) -> Path:
@@ -168,19 +169,57 @@ def open_with_mdreader(path: Path, dry_run: bool) -> int:
         return EXIT_FAIL
 
 
-def open_with_command(cmd: list[str], path: Path, dry_run: bool, label: str) -> int:
+def system_open_cmd() -> list[str] | None:
+    system = platform.system().lower()
+    if system == "darwin":
+        return ["open"]
+    if system == "linux":
+        return ["xdg-open"]
+    return None
+
+
+def open_with_command(
+    cmd: list[str],
+    path: Path,
+    dry_run: bool,
+    label: str,
+    *,
+    allow_system_fallback: bool = True,
+) -> int:
+    """Run configured open argv + path. On failure, optionally fall back to system open."""
     full = cmd + [str(path)]
     if dry_run:
         print("DRY-RUN:", " ".join(full))
         return EXIT_OK
     try:
-        subprocess.run(full, check=False)
-        print(f"opened ({label}): {path}")
-        remember(path)
-        return EXIT_OK
+        r = subprocess.run(full, check=False, capture_output=True, text=True)
+        if r.returncode == 0:
+            print(f"opened ({label}): {path}")
+            remember(path)
+            return EXIT_OK
+        err = (r.stderr or r.stdout or "open failed").strip()
+        if allow_system_fallback and label != "system":
+            print(
+                f"warn: {label} failed ({err}); falling back to system open",
+                file=sys.stderr,
+            )
+            return open_with_system(path, dry_run)
+        print(f"failed to open ({label}): {err}", file=sys.stderr)
+        return EXIT_FAIL
     except OSError as e:
+        if allow_system_fallback and label != "system":
+            print(f"warn: {label} error ({e}); falling back to system open", file=sys.stderr)
+            return open_with_system(path, dry_run)
         print(f"failed to open: {e}", file=sys.stderr)
         return EXIT_FAIL
+
+
+def open_with_system(path: Path, dry_run: bool) -> int:
+    cmd = system_open_cmd()
+    if cmd is None:
+        print(f"unsupported platform: {platform.system()}", file=sys.stderr)
+        return EXIT_USAGE
+    return open_with_command(cmd, path, dry_run, "system", allow_system_fallback=False)
 
 
 def resolve_app_key(cfg: dict, path: Path) -> str:
@@ -188,7 +227,8 @@ def resolve_app_key(cfg: dict, path: Path) -> str:
     ext = path.suffix.lower()
     if ext in by_ext:
         return str(by_ext[ext])
-    return str(cfg.get("default") or "md-reader")
+    # Unknown extension → system open (safer than forcing MdReader on binaries)
+    return str(cfg.get("default") or "system")
 
 
 def open_target(path: Path, dry_run: bool, force_app: str | None) -> int:
@@ -199,6 +239,9 @@ def open_target(path: Path, dry_run: bool, force_app: str | None) -> int:
     if app_key in ("md-reader", "viewer"):
         return open_with_mdreader(path, dry_run)
 
+    if app_key == "system":
+        return open_with_system(path, dry_run)
+
     system = platform.system().lower()  # darwin / linux
     plat = "darwin" if system == "darwin" else system
     app_def = apps.get(app_key)
@@ -206,13 +249,8 @@ def open_target(path: Path, dry_run: bool, force_app: str | None) -> int:
         cmd = list(app_def[plat])
         return open_with_command(cmd, path, dry_run, app_key)
 
-    # Unknown app key → system open
-    if system == "darwin":
-        return open_with_command(["open"], path, dry_run, "system")
-    if system == "linux":
-        return open_with_command(["xdg-open"], path, dry_run, "system")
-    print(f"unsupported platform: {system}", file=sys.stderr)
-    return EXIT_USAGE
+    # Unknown app key or no platform entry → system open
+    return open_with_system(path, dry_run)
 
 
 def main(argv: list[str] | None = None) -> int:
