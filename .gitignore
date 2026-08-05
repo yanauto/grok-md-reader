@@ -22,3 +22,11 @@ plugins/md-reader/scripts/.cache/
 # project-memory-system runtime (SessionEnd raw transcripts)
 .claude/sessions/
 
+
+# 记忆框架件不进远端(2026-08-05,依 8/3 发布边界校准)
+/CLAUDE.md
+/AGENTS.md
+/.claude/
+/docs/sessions/
+/docs/handoffs/
+/docs/decisions/
